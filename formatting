@@ -1,0 +1,42 @@
+import cdflib
+import os
+import numpy as np
+
+cdffile = cdflib.CDF('/Users/madelinefarrugia/march1.cdf')
+cdf_info = cdffile.cdf_info()
+print(cdf_info)
+
+
+variable2 = cdffile.varget('Timestamp')
+print("Timestamp Values:")
+for value in variable2[:10]:  
+    print(value)
+print("                              ")    
+variable3 = cdffile.varget('Latitude')
+print("Latitude Values:")
+for value in variable3[:10]:
+    print(value)
+print("                              ")    
+variable4 = cdffile.varget('Longitude')   
+print("Longitude Values:")
+for value in variable4[:10]:
+    print(value)
+print("                              ")    
+variable5 = cdffile.varget('Height')   
+print("Height Values:")
+for value in variable5[:10]:
+    print(value)
+print("                              ")    
+variable6 = cdffile.varget('T_elec')    
+print("Electron Temperature Values:")
+for value in variable6[:10]:
+    print(value)
+number_of_elements = variable6.size
+print(number_of_elements)
+
+path = '/Users/madelinefarrugia/swarm.txt'
+
+with open(path, 'w') as file:
+    file.write('Time Stamp\tHeight\tLatitude\tLongitude\tElectron Temperature\n')
+    for elem1, elem2, elem3, elem4, elem5 in zip(variable2, variable5, variable3, variable4, variable6):
+        file.write(f"{elem1}\t{elem2}\t{elem3}\t{elem4}\t{elem5}\n")
