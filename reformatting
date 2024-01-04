@@ -1,0 +1,31 @@
+import cdflib
+import os
+import numpy as np
+from datetime import datetime, timedelta
+import ephem
+from datetime import datetime
+
+cdffile = cdflib.CDF('/Users/madelinefarrugia/march1.cdf')
+
+variable2 = cdffile.varget('Timestamp')
+variable3 = cdffile.varget('Latitude')
+variable4 = cdffile.varget('Longitude')   
+variable5 = cdffile.varget('Height')   
+variable6 = cdffile.varget('T_elec')    
+
+target_year = 2023
+seconds_array = variable2 / 1000.0
+date_time_array = np.array([datetime.utcfromtimestamp(seconds) for seconds in seconds_array])
+formatted_date_array = np.array([dt.strftime("%d/%m/%Y %H:%M") for dt in date_time_array])
+adjusted_date_array = np.array([dt.replace(year=target_year) for dt in date_time_array])
+formatted_adjusted_date_array = np.array([dt.strftime("%d/%m/%Y %H:%M") for dt in adjusted_date_array])
+print(f"The adjusted dates are: {formatted_adjusted_date_array}")
+
+path = '/Users/madelinefarrugia/swarm.txt'
+
+with open(path, 'w') as file:
+    file.write('Time Stamp\tHeight\tLatitude\tLongitude\tElectron Temperature\n')
+    for elem1, elem2, elem3, elem4, elem5 in zip(formatted_adjusted_date_array, variable5, variable3, variable4, variable6):
+        #file.write('{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\n'.format(elem1, elem2, elem3, elem4, elem5))
+        file.write(f"{elem1}\t{elem2}\t{elem3}\t{elem4}\t{elem5}\n")
+
