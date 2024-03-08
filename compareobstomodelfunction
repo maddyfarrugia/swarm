@@ -1,0 +1,232 @@
+def find_indices(big_array, number):
+        def condition(x): return x==number
+        output = [idx for idx, element in enumerate(big_array) if condition(element)]
+        return output
+
+# COMPARING MODEL DATA TO SWARM DATA #
+    
+# Opening one days worth of model data to read
+input_model_data = Dataset('/Users/madelinefarrugia/20230310.nc', 'r+')
+
+# Creating a new conjunction file to store all the model data as well as observation data
+#conjunction_file = Dataset('conjunctionfile.nc', 'w')
+
+print("Variables:")
+for var in input_model_data.variables:
+    print(var)
+
+print("\nDimensions:")
+for dim in input_model_data.dimensions:
+    print(dim, ":", len(input_model_data.dimensions[dim]))
+
+# Naming variables within input netCDF file
+timestamp = input_model_data['timestamp'][:]
+latitude = input_model_data['lat'][:]
+longitude = input_model_data['lon'][:]
+height = input_model_data['height'][:]
+IRI_data = input_model_data['TelectronIRI'][:]
+TIEGCM_data = input_model_data['TelectronTIEGCM'][:]
+GTIM_data = input_model_data['TelectronGTIM'][:]
+WAMIPE_data = input_model_data['TelectronWAMIPE'][:]
+#input_model_data.close()
+
+# Creating an empty array the size of the model data arrays
+# Shape (48,73,91,93)
+merged_data = np.empty((4,) + TIEGCM_data.shape[:], dtype=TIEGCM_data.dtype)
+print(merged_data.shape)
+# Collecting data from IRI and WAMIPE models at timestamp 0, the 10th latitude point, 10th longitude point
+# and at all heights and putting them inside the empty array
+merged_data[0] = IRI_data[:, :, :, :]
+merged_data[1] = WAMIPE_data[:, :, :, :]
+merged_data[2] = TIEGCM_data[:, :, :, :]
+merged_data[3] = GTIM_data[:, :, :, :]
+print(merged_data[0].shape)
+# Defining each row of the array
+row1 = merged_data[0].flatten()
+row2 = merged_data[1].flatten()
+row3 = merged_data[2].flatten()
+row4 = merged_data[3].flatten()
+# Identify positions where -999 appears in both rows
+both_indices = np.where((row1 == -999.0) & (row2 == -999.0) & (row3 == -999.0) & (row4 == -999.0))[0]
+# Remove -999 values from both rows when it appears at the same indices
+row1 = np.delete(row1, both_indices)
+row2 = np.delete(row2, both_indices)
+row3 = np.delete(row3, both_indices)
+row4 = np.delete(row4, both_indices)
+# Checking that all were removed
+count_both = np.sum((row1 == -999.0) & (row2 == -999.0) & (row3 == -999.0) & (row4 == -999.0))
+print(count_both)
+# Identifying positions where -999 values appear in one row at a specific index but not in the corresponding
+# index within the other row
+only_row1_indices = np.where((row1 == -999.0) & (row2 != -999.0) & (row3 != -999.0) & (row4 != -999.0))[0]
+row1_and_row4_indices = np.where((row1 == -999.0) & (row2 != -999.0) & (row3 != -999.0) & (row4 == -999.0))[0]
+only_row2_indices = np.where((row2 == -999.0) & (row1 != -999.0) & (row3 != -999.0) & (row4 != -999.0))[0]
+row2_and_row4_indices = np.where((row2 == -999.0) & (row1 != -999.0) & (row3 != -999.0) & (row4 == -999.0))[0]
+row1_and_row2_indices = np.where((row1 == -999.0) & (row2 == -999.0) & (row3 != -999.0) & (row4 != -999.0))[0]
+row1_row2_and_row4_indices = np.where((row1 == -999.0) & (row2 == -999.0) & (row3 != -999.0) & (row4 == -999.0))[0]
+row1_and_row3_indices = np.where((row1 == -999.0) & (row2 != -999.0) & (row3 == -999.0) & (row4 != -999.0))[0]
+row1_row3_and_row4_indices = np.where((row1 == -999.0) & (row2 != -999.0) & (row3 == -999.0) & (row4 == -999.0))[0]
+row2_and_row3_indices = np.where((row1 != -999.0) & (row2 == -999.0) & (row3 == -999.0) & (row4 != -999.0))[0]
+row2_row3_and_row4_indices = np.where((row1 != -999.0) & (row2 == -999.0) & (row3 == -999.0) & (row4 == -999.0))[0]
+only_row3_indices = np.where((row1 != -999.0) & (row2 != -999.0) & (row3 == -999.0) & (row4 != -999.0))[0]
+row3_and_row4_indices = np.where((row1 != -999.0) & (row2 != -999.0) & (row3 == -999.0) & (row4 == -999.0))[0]
+only_row4_indices = np.where((row1 != -999.0) & (row2 != -999.0) & (row3 != -999.0) & (row4 == -999.0))[0]
+row1_row2_and_row3_indices = np.where((row1 == -999.0) & (row2 == -999.0) & (row3 == -999.0) & (row4 != -999.0))[0]
+# Combine the indices from both rows
+indices_to_remove = np.concatenate([only_row1_indices, row1_and_row4_indices, only_row2_indices, row2_and_row4_indices,
+                                   row1_and_row2_indices, row1_row2_and_row4_indices, row1_and_row3_indices,
+                                   row1_row3_and_row4_indices, row2_and_row3_indices, row2_row3_and_row4_indices,
+                                   only_row3_indices, row3_and_row4_indices, only_row4_indices, row1_row2_and_row3_indices])
+# Remove the corresponding values from both rows (i.e. -999 values and numerical values)
+row1 = np.delete(row1, indices_to_remove)
+row2 = np.delete(row2, indices_to_remove)
+row3 = np.delete(row3, indices_to_remove)
+row4 = np.delete(row4, indices_to_remove)
+# Making sure all -999 values were removed
+count_row1 = np.count_nonzero(row1 == -999.0)
+print(count_row1)
+count_row2 = np.count_nonzero(row2 == -999.0)
+print(count_row2)
+count_row3 = np.count_nonzero(row3 == -999.0)
+print(count_row3)
+count_row4 = np.count_nonzero(row4 == -999.0)
+print(count_row4)
+print(row1.shape)
+print(row2.shape)
+print(row3.shape)
+print(row4.shape)
+# Merging both rows of values (without -999 values) into a single array consisting of two rows
+final_merged_data = np.vstack((row1, row2, row3, row4))
+print(final_merged_data.shape)
+# Making sure no -999 values remain
+count_negative_999 = np.count_nonzero(final_merged_data == -999.0)
+print(count_negative_999)
+
+# Plotting one row against anotehr as a scatter plot i.e. IRI data against WAMIPE data
+x_values1 = final_merged_data[0]
+y_values1 = final_merged_data[1]
+plt.scatter(x_values1, x_values1, s=0.1, alpha=0.01)  # s is for marker size (optional)
+plt.xlabel('IRI Data')
+plt.ylabel('WAMIPE Data')
+plt.title('Scatter Plot')
+plt.show()
+
+x_values2 = final_merged_data[0]
+y_values2 = final_merged_data[2]
+plt.scatter(x_values2, y_values2, s=1)  # s is for marker size (optional)
+plt.xlabel('IRI Data')
+plt.ylabel('TIEGCM Data')
+plt.title('Scatter Plot')
+plt.show()
+
+x_values3 = final_merged_data[2]
+y_values3 = final_merged_data[3]
+plt.scatter(x_values3, y_values3, s=1)  # s is for marker size (optional)
+plt.xlabel('TIEGCM Data')
+plt.ylabel('GITM Data')
+plt.title('Scatter Plot')
+plt.show()
+
+x_values4 = final_merged_data[1]
+y_values4 = final_merged_data[3]
+plt.scatter(x_values4, y_values4, s=1)  # s is for marker size (optional)
+plt.xlabel('WAMIPE Data')
+plt.ylabel('GITM Data')
+plt.title('Scatter Plot')
+plt.show()
+
+x_values5 = final_merged_data[0]
+y_values5 = final_merged_data[3]
+plt.scatter(x_values5, y_values5, s=1)  # s is for marker size (optional)
+plt.xlabel('IRI Data')
+plt.ylabel('GITM Data')
+plt.title('Scatter Plot')
+plt.show()
+
+x_values6 = final_merged_data[1]
+y_values6 = final_merged_data[2]
+plt.scatter(x_values6, y_values6, s=1)  # s is for marker size (optional)
+plt.xlabel('WAMIPE Data')
+plt.ylabel('TIEGCM Data')
+plt.title('Scatter Plot')
+plt.show()
+
+#count_above_6000 = np.sum(final_merged_data[0] > 2000)
+#print("Number of values above 2000 in the first row:", count_above_6000)
+#count_above_6000_two = np.sum(final_merged_data[1] > 2000)
+#print("Number of values above 2000 in the second row:", count_above_6000_two)
+        
+# Copy global attributes from input netCDF to new netCDF file
+conjunction_file.setncatts(input_model_data.__dict__)
+# Copy dimensions across
+for dimname, dim in input_model_data.dimensions.items():
+    conjunction_file.createDimension(dimname, len(dim) if not dim.isunlimited() else None)
+# Copy variables and their attributes
+for varname, var in input_model_data.variables.items():
+    new_var = conjunction_file.createVariable(varname, var.dtype, var.dimensions)
+    new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+    new_var[:] = var[:]  # Copy variable values
+# Add a new Te observation variable + corresponding dimensions
+Obs_time_dim = conjunction_file.createDimension('Observation time', 365)
+Obs_lat_dim = conjunction_file.createDimension('Observation latitude', 180)
+Obs_lon_dim = conjunction_file.createDimension('Observation longitude', 360)
+Obs_height_dim = conjunction_file.createDimension('Observation height', 360)
+TeObs = conjunction_file.createVariable('Observation Electron Temperature', 'f4', ('Observation time', 'Observation latitude', 'Observation longitude', 'Observation height'))
+TeObs.long_name = 'Observation Electron Temperature'
+TeObs.units = 'K'
+
+# Converting all model data into a np array
+latitude_array = latitude.astype('float32')
+longitude_array = longitude.astype('float32')
+height_array = height.astype('float32')
+time_array = timestamp.astype('float32')
+
+# Defining matching lat value 
+matchinglat = 33.2
+modlat = abs(latitude_array - matchinglat)
+# Matching closest value in model data to the chosen value
+valuematchlatitude = find_indices(modlat, min(modlat))
+if min(modlat) > 2:
+    print("No latitude match found")
+else:
+    # Printing the matched value and its position
+    print("Latitude match found:")
+    print(valuematchlatitude)
+    print(latitude_array[valuematchlatitude[0]])
+    print(min(modlat))
+
+# Reapeating for longitude
+matchinglon = 110.3
+modlon = abs(longitude_array - matchinglon)
+valuematchlongitude = find_indices(modlon, min(modlon))
+if min(modlon) > 5:
+    print("No longitude match found")
+else:
+    print("Longitude match found:")
+    print(valuematchlongitude)
+    print(longitude_array[valuematchlongitude[0]])
+    print(min(modlon))
+
+# Repeating for height
+matchingheight = 532.9
+modheight = abs(height_array - matchingheight)
+valuematchheight = find_indices(modheight, min(modheight))
+if min(modheight) > 10:
+    print("No height match found")
+else:
+    print("Height match found:")
+    print(valuematchheight)
+    print(height_array[valuematchheight[0]])
+    print(min(modheight))
+
+# Matching for timestamp
+matchingtime = 114.7
+modtime = abs(time_array - matchingtime)
+valuematchtime = find_indices(modtime, min(modtime))
+if min(modtime) > 30:
+    print("No time match found")
+else:
+    print("Time match found:")
+    print(valuematchtime)
+    print(time_array[valuematchtime[0]])
+    print(min(modtime))
