@@ -1,0 +1,80 @@
+SERVER_URL = 'https://vires.services/ows'
+import datetime as dt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
+# Control the HTML display of the datasets
+xr.set_options(display_expand_attrs=False, display_expand_coords=True, display_expand_data=True)
+
+from viresclient import SwarmRequest
+
+request = SwarmRequest(SERVER_URL)
+
+tie_vars = [
+    # Positional information in geodetic (GD) and geocentric (GC) frames
+    #  redundant with VirES variables Latitude, Longitude, Radius (in geocentric frame)
+    "Latitude_GD", "Longitude_GD", "Height_GD", "Radius_GC",
+    # Quasi-dipole magnetic latitude and local time
+    #  redundant with VirES auxiliaries, QDLat & MLT
+    "Latitude_QD", "MLT_QD",
+    # Neutral temperature from NRLMSISE-00 model
+    "Tn_msis",
+    # Corrected Swarm LP electron temperature
+    "Te_adj_LP",
+    # Estimated ion temperature from TII drift at high latitudes
+    "Ti_meas_drift",
+    # Estimated Ion temperature from Weimer 2005 model drifts at high latitudes
+    "Ti_model_drift",
+    # Bitwise flags with process information
+    #  See the Product definition document for details
+    "Flag_ti_meas", "Flag_ti_model"
+]
+
+#request.get_times_for_orbits(52269, 52282, mission="Swarm", spacecraft="Alpha")
+
+start = dt.datetime(2023, 3, 10, 0, 0, 0)
+end = dt.datetime(2023, 3, 10, 9, 0, 0)
+
+request = SwarmRequest(SERVER_URL)
+request.set_collection("SW_OPER_EFIATIE_2_")
+request.set_products(
+    measurements=tie_vars,
+    auxiliaries=["OrbitNumber", "OrbitDirection", "MLT"]
+)
+data = request.get_between(start, end)
+
+df = data.as_dataframe()
+df.head()
+
+ds = data.as_xarray()
+#ds
+
+# Set up a time series plot where each row is an orbit
+nrows = len(np.unique(ds["OrbitNumber"]))
+fig, axes = plt.subplots(nrows=nrows, ncols=1, figsize=(10, 10))
+axes_r = [ax.twinx() for ax in axes]
+for i, (orbitnumber, ds_orbit) in enumerate(ds.groupby("OrbitNumber")):
+    # Plot electron & ion temperatures, measured and modelled
+    ds_orbit.plot.scatter(x="Timestamp", y="Te_adj_LP", s=0.1, ax=axes[i], color="tab:purple")
+    # Identify times closest to North and South pole
+    t_NP = ds_orbit["Timestamp"].isel(Timestamp=ds_orbit["Latitude"].argmax()).values
+    t_SP = ds_orbit["Timestamp"].isel(Timestamp=ds_orbit["Latitude"].argmin()).values
+    axes[i].axvline(mpl.dates.date2num(t_NP), color="gray")
+    axes[i].axvline(mpl.dates.date2num(t_SP), color="gray")
+    # Tidy up labelling
+    axes[i].xaxis.set_major_formatter(mpl.dates.DateFormatter("%H:%M"))
+    axes[i].set_xlabel("")
+# Add legend manually
+purple = mpl.patches.Patch(color="tab:purple", label="Te_adj_LP")
+axes[0].legend(handles=[purple])
+# Tidy up axes and labelling
+for ax in axes:
+    ax.set_ylim(500, 4000)
+axes[-1].set_xlabel("Time")
+title = "".join([
+    f"Swarm {ds['Spacecraft'].data[0]} ion temperatures, ",
+    ds["Timestamp"].dt.date.data[0].isoformat(),
+    f"\n{[s for s in ds.attrs['Sources'] if 'TIE' in s]}"
+])
+fig.suptitle(title);
