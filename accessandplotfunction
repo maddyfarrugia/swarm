@@ -7,377 +7,377 @@ def export_swarm_data(start_date_str, end_date_str):
     parameters = 'Timestamp,Latitude_GD,Longitude_GD,Height_GD,Radius_GC,Te_adj_LP'
 
 
-    # Specify the period of time you would like to collect data for in format yyyy/mm/dd hh:mm:ss
-    #start_date_str = '2023-02-23T00:00:00.000000Z'
-    #end_date_str = '2023-02-24T00:00:00.000000Z'  
+# Specify the period of time you would like to collect data for in format yyyy/mm/dd hh:mm:ss
+#start_date_str = '2023-02-23T00:00:00.000000Z'
+#end_date_str = '2023-02-24T00:00:00.000000Z'  
 
-    # Convert start and stop strings to datetime objects to loop through days 
-    start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
-    end_date = datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+# Convert start and stop strings to datetime objects to loop through days 
+start_date = datetime.strptime(start_date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
+end_date = datetime.strptime(end_date_str, '%Y-%m-%dT%H:%M:%S.%fZ')
 
-    # All data is collected twice a second
-    # Specify the length of each segment (24 hours in this case)
-    segment_length = timedelta(hours=24)
+# All data is collected twice a second
+# Specify the length of each segment (24 hours in this case)
+segment_length = timedelta(hours=24)
+
+# Creating empty arrays to hold SWARM data within the loop
+Te_array = np.array([])
+lat_array = np.array([])
+lon_array = np.array([])
+height_array = np.array([])
+
+# Perform tasks in a loop for each 24-hour segment until the end date is reached
+while start_date < end_date:
+    # printing where the code is up to
+    print(f"Downloading data for segment: {start_date} to {start_date + segment_length}")
+
+    # defining the start date and stop date (24hrs after start date)
+    start = start_date
+    stop = start_date + segment_length
+
+    # converting start and stop date into a string to pull data from HAPI (doesn't accept datetime objects)
+    start_str = start.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    end_str = stop.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+    # pulling data from HAPI for a 24hr period
+    data, meta = hapi(server, dataset, parameters, start_str, end_str)
+
+    # creating a new variable 'timestamp' and collecting only the timestamp data stored within the variable 'data' 
+    # this is repeated for all variables collected from HAPI with the 'parameters' variable
+    timestamp = np.array([nested_list[0] for nested_list in data])
+    latitude = np.array([nested_list[1] for nested_list in data])
+    longitude = np.array([nested_list[2] for nested_list in data])
+    height = np.array([nested_list[3] for nested_list in data])
+    radius = np.array([nested_list[4] for nested_list in data])
+    Te = np.array([nested_list[5] for nested_list in data])
     
-    # Creating empty arrays to hold SWARM data within the loop
-    Te_array = np.array([])
-    lat_array = np.array([])
-    lon_array = np.array([])
-    height_array = np.array([])
-
-    # Perform tasks in a loop for each 24-hour segment until the end date is reached
-    while start_date < end_date:
-        # printing where the code is up to
-        print(f"Downloading data for segment: {start_date} to {start_date + segment_length}")
+    # As the loop goes on daily electron temp, lat, lon and height data is appended  to np arrays
+    Te_array = np.append(Te_array, Te) 
+    lat_array = np.append(lat_array, latitude)
+    lon_array = np.append(lon_array, longitude)
+    height_array = np.append(height_array, height)
+    print('The length of the original lat array is:', len(lat_array))
+    print(len(lon_array))
+    print(len(height_array))
     
-        # defining the start date and stop date (24hrs after start date)
-        start = start_date
-        stop = start_date + segment_length
+    # Testing radius equation and deriving SWARM altitude from it
+    a = 6378137
+    c = 6356752.3
+    f = (a-c)/a
+    theta = latitude 
+    theta_radians = np.radians(theta)
+    shifted_theta_rad = theta_radians 
+    Earth_radius = 1.0 / np.sqrt((np.cos(theta_radians)**2 / a**2) + (np.sin(theta_radians)**2 / c**2))
+    RHSradius = a * (1 - (f * (np.sin(theta_radians)**2)))
+    altitude = radius - Earth_radius    
 
-        # converting start and stop date into a string to pull data from HAPI (doesn't accept datetime objects)
-        start_str = start.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-        end_str = stop.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    # creating a date prefix which will serve as the name of each netCDF file created depending on the start day
+    date_prefix = start_str[:10]
 
-        # pulling data from HAPI for a 24hr period
-        data, meta = hapi(server, dataset, parameters, start_str, end_str)
-
-        # creating a new variable 'timestamp' and collecting only the timestamp data stored within the variable 'data' 
-        # this is repeated for all variables collected from HAPI with the 'parameters' variable
-        timestamp = np.array([nested_list[0] for nested_list in data])
-        latitude = np.array([nested_list[1] for nested_list in data])
-        longitude = np.array([nested_list[2] for nested_list in data])
-        height = np.array([nested_list[3] for nested_list in data])
-        radius = np.array([nested_list[4] for nested_list in data])
-        Te = np.array([nested_list[5] for nested_list in data])
-        
-        # As the loop goes on daily electron temp, lat, lon and height data is appended  to np arrays
-        Te_array = np.append(Te_array, Te) 
-        lat_array = np.append(lat_array, latitude)
-        lon_array = np.append(lon_array, longitude)
-        height_array = np.append(height_array, height)
-        print('The length of the original lat array is:', len(lat_array))
-        print(len(lon_array))
-        print(len(height_array))
-        
-        # Testing radius equation and deriving SWARM altitude from it
-        a = 6378137
-        c = 6356752.3
-        f = (a-c)/a
-        theta = latitude 
-        theta_radians = np.radians(theta)
-        shifted_theta_rad = theta_radians 
-        Earth_radius = 1.0 / np.sqrt((np.cos(theta_radians)**2 / a**2) + (np.sin(theta_radians)**2 / c**2))
-        RHSradius = a * (1 - (f * (np.sin(theta_radians)**2)))
-        altitude = radius - Earth_radius    
-
-        # creating a date prefix which will serve as the name of each netCDF file created depending on the start day
-        date_prefix = start_str[:10]
-
-        # creating a new netCDF file 
-        filename = f'swarm{date_prefix}.nc'
-        mode = 'w'
-        
-        try: ncfile.close()  # just to be safe, make sure dataset is not already open.
-        except: pass
-
-        with nc.Dataset(filename, mode) as file:
-            # creating a dimension value for the timestamp variable based on the length of the timestamp variable created previously
-            file.createDimension('timestamp', len(timestamp))
-            # creating and importing a copy of the timestamp variable to import into the netCDF file
-            time_variable = file.createVariable('timestamp', 'S24', ('timestamp',))  
-            time_variable[:] = np.array(timestamp, dtype='S24')
-
-            # repeating these same steps for the lat, lon and electron temp variables
-            file.createDimension('latitude', len(latitude))
-            lat_variable = file.createVariable('latitude', 'f8', ('latitude',))
-            lat_variable[:] = np.array(latitude, dtype='f8')
-
-            file.createDimension('longitude', len(longitude))
-            lon_variable = file.createVariable('longitude', 'f8', ('longitude',))
-            lon_variable[:] = np.array(longitude, dtype='f8')
-            
-            file.createDimension('Height', len(height))
-            height_variable = file.createVariable('Height', 'f8', ('Height',))
-            height_variable[:] = np.array(height, dtype='f8')
-
-            file.createDimension('Te', len(Te))
-            Te_variable = file.createVariable('Te', 'f8', ('Te',))
-            Te_variable[:] = np.array(Te, dtype='f8')
-
-            file.createDimension('Altitude', len(altitude))
-            altitude_variable = file.createVariable('Altitude', 'f8', ('Altitude',))
-            altitude_variable[:] = np.array(altitude, dtype='f8')
-
-            # printing the contents of the new netCDF file including all variable dimensions, names and values    
-        with nc.Dataset(filename, 'r') as file:
-            print("Dimensions:")
-            for dimname, dimobj in file.dimensions.items():
-                print(f"  {dimname}: {len(dimobj)}")
-
-            print("\nVariables:")
-            for varname, varobj in file.variables.items():
-                print(f"  {varname}:")
-                print(f"    Shape: {varobj.shape}")
-                print(f"    Data: {varobj[:]}")
-        
-
-        # plotting all variables collected in a time series for each day within selected time period
-        hapiplot(data, meta)
-        
-        # Plotting altitude vs height data from HAPI servers 
-        #alt_data = altitude
-        #height_data = height
-        #time_data = np.arange(len(alt_data))
-        #plt.plot(time_data, height_data, marker='o', markersize = 0.5, label = 'HAPI Height Data')
-        #plt.plot(time_data, alt_data, marker='o', markersize = 0.5, label = 'Derived Altitude Data')
-        #plt.xlabel('Time')
-        #plt.ylabel('Altitude (m)')
-        #plt.title('Altitude Plot with Respect to Time')
-        #plt.legend()
-        #plt.show()   
-        
-        # Plotting electron temperature as a time series 
-        #temp_data = Te
-        #plt.plot(time_data, temp_data, marker='o', markersize = 0.5, label = 'Electron Temperature vs Time')
-        #plt.xlabel('Time')
-        #plt.ylabel('Electron Temperature')
-        #plt.title('Te vs Time')
-        #plt.show()
-        
-        # PLOTTING LHS EQUATION
-        #lhs_data = Earth_radius 
-        #time_data = np.arange(len(lhs_data))
-        # PLOTTING RHS EQUATION
-        #rhs_data = RHSradius
-        #time_data = np.arange(len(rhs_data))  
-        # PLOTTING TOGETHER - ensuring calculations give constant results
-        #plt.plot(time_data, lhs_data, label='Equation 1')
-        #plt.plot(time_data, rhs_data, label='Equation 2')
-        #plt.xlabel('Time')
-        #plt.ylabel('Radius (m)')
-        #plt.legend()
-        #plt.show()
-
-        # PLOTTING RHS EQUATION + RADIUS TOGETHER - should give equal values
-        #rhs_data = RHSradius
-        #time_data = np.arange(len(rhs_data))
-        #plt.plot(time_data, radius, label='Radius from SWARM')
-        #plt.plot(time_data, rhs_data, label='Radius from Equation with dilation + shifted theta')
-        #plt.xlabel('Time')
-        #plt.ylabel('Radius (m)')
-        #plt.legend()
-        #plt.show()
-        
-        # PLOTTING LATITUDE IN DEG
-        #deg_values = shiftedlat
-        #time_data = np.arange(len(deg_values))
-        #plt.plot(time_data, deg_values, label='Latitude in radians + shifted by pi/2')
-        #plt.xlabel('Time')
-        #plt.ylabel('Latitude')
-        #plt.legend()
-        #plt.show()
-
-        # Update start date for the next day
-        start_date += segment_length
-
-        # Add a condition to break the loop if start_date exceeds or equals end_date
-        if start_date >= end_date:
-            break
+    # creating a new netCDF file 
+    filename = f'swarm{date_prefix}.nc'
+    mode = 'w'
     
-    # Searching for nan values in Te data and calculating mean and std dev excluding the nan values
-    #print(Te_array)
-    has_nan = np.isnan(Te_array.flatten())
-    print(np.where(has_nan)[0])
-    mean_value = np.mean(Te_array[~has_nan])
-    print(mean_value)
-    std_dev = np.std(Te_array[~has_nan])
-    print(std_dev)
-    # Establishing a lower and higher threshold to excluding outliers in Te data
-    lower_threshold = mean_value - 2 * std_dev
-    upper_threshold = mean_value + 2 * std_dev
-    outliers = Te_array[(Te_array < lower_threshold) | (Te_array > upper_threshold)]
+    try: ncfile.close()  # just to be safe, make sure dataset is not already open.
+    except: pass
 
-    # Plotting distribution of Te values with outliers 
-    plt.hist(Te_array, bins=100, density=True, alpha=0.9, color='blue', edgecolor='blue')
-    plt.xlim(0, 8000)  
-    plt.ylim(0, 0.002)
-    plt.xlabel('Values')
-    plt.ylabel('Probability Density')
-    plt.title('Distribution of Te with outliers')
-    plt.show()
+    with nc.Dataset(filename, mode) as file:
+        # creating a dimension value for the timestamp variable based on the length of the timestamp variable created previously
+        file.createDimension('timestamp', len(timestamp))
+        # creating and importing a copy of the timestamp variable to import into the netCDF file
+        time_variable = file.createVariable('timestamp', 'S24', ('timestamp',))  
+        time_variable[:] = np.array(timestamp, dtype='S24')
+
+        # repeating these same steps for the lat, lon and electron temp variables
+        file.createDimension('latitude', len(latitude))
+        lat_variable = file.createVariable('latitude', 'f8', ('latitude',))
+        lat_variable[:] = np.array(latitude, dtype='f8')
+
+        file.createDimension('longitude', len(longitude))
+        lon_variable = file.createVariable('longitude', 'f8', ('longitude',))
+        lon_variable[:] = np.array(longitude, dtype='f8')
+        
+        file.createDimension('Height', len(height))
+        height_variable = file.createVariable('Height', 'f8', ('Height',))
+        height_variable[:] = np.array(height, dtype='f8')
+
+        file.createDimension('Te', len(Te))
+        Te_variable = file.createVariable('Te', 'f8', ('Te',))
+        Te_variable[:] = np.array(Te, dtype='f8')
+
+        file.createDimension('Altitude', len(altitude))
+        altitude_variable = file.createVariable('Altitude', 'f8', ('Altitude',))
+        altitude_variable[:] = np.array(altitude, dtype='f8')
+
+        # printing the contents of the new netCDF file including all variable dimensions, names and values    
+    with nc.Dataset(filename, 'r') as file:
+        print("Dimensions:")
+        for dimname, dimobj in file.dimensions.items():
+            print(f"  {dimname}: {len(dimobj)}")
+
+        print("\nVariables:")
+        for varname, varobj in file.variables.items():
+            print(f"  {varname}:")
+            print(f"    Shape: {varobj.shape}")
+            print(f"    Data: {varobj[:]}")
     
-    # Printing outlier information
-    data_no_outliers = Te_array[(Te_array >= lower_threshold) & (Te_array <= upper_threshold)]
-    print("Lower Threshold:", lower_threshold)
-    print("Upper Threshold:", upper_threshold)
-    print("Number of outliers:", len(outliers))
-    print("Data without outliers:", data_no_outliers)
+
+    # plotting all variables collected in a time series for each day within selected time period
+    hapiplot(data, meta)
     
-    # Plotting distribution of Te values without outliers
-    plt.hist(data_no_outliers, bins=100, density=True, alpha=0.9, color='green', edgecolor='green')
-    #plt.xlim(0, 8000)  
-    #plt.ylim(0, 0.002)
-    plt.xlabel('Values')
-    plt.ylabel('Probability Density')
-    plt.title('Distribution of Te after Discarding Outliers')
-    plt.show()
+    # Plotting altitude vs height data from HAPI servers 
+    #alt_data = altitude
+    #height_data = height
+    #time_data = np.arange(len(alt_data))
+    #plt.plot(time_data, height_data, marker='o', markersize = 0.5, label = 'HAPI Height Data')
+    #plt.plot(time_data, alt_data, marker='o', markersize = 0.5, label = 'Derived Altitude Data')
+    #plt.xlabel('Time')
+    #plt.ylabel('Altitude (m)')
+    #plt.title('Altitude Plot with Respect to Time')
+    #plt.legend()
+    #plt.show()   
     
-    # Testing of adjustment types to SWARM data to match to model data
-    # First type was collecting data every 30 mins and using that point as the data point 
-    no_range = data_no_outliers[::60]
-    
-    # Second type was using a fifteen minute range on either side of the 30 minute mark and averaging 
-    # all the data within that window making that average the data point for every 30 mins
-    fifteen_min = np.arange(0, len(data_no_outliers), 3600)
-    fifteen_min_averages = []
-    # Compute the average for each group of 60th element and its surrounding elements
-    for i in fifteen_min:
-        te_index = min(i, len(data_no_outliers) - 1)
-        # Get indices of the 30 elements before and after the 60th element
-        surrounding_fifteen_indices = np.arange(max(0, te_index - 1800), min(te_index + 1801, len(data_no_outliers)))
-        selected_te = data_no_outliers[surrounding_fifteen_indices]
-        # Compute the average of the selected elements
-        fifteen_min_average = np.mean(selected_te)
-        # Append the average to the selected averages list
-        fifteen_min_averages.append(fifteen_min_average)
-    # Add the average of the last group (from the last element of data_no_outliers)    
-    selected_te_last = data_no_outliers[-1801:]
-    fifteen_min_average_last = np.mean(selected_te_last)
-    fifteen_min_averages.append(fifteen_min_average_last)
-    # Converting average array into np array
-    fifteen_min_averages = np.array(fifteen_min_averages)
-    print(len(fifteen_min_averages))
-    print(fifteen_min_averages[:48])
-    
-    # Plotting the no window, 2 min window and 15 min window to assess best results (repeated with many different ranges)
-    #time = np.linspace(0, 10, 2757) 
-    #plt.plot(time, no_range, 'ro', markersize=1, label='No Range')
-    #plt.plot(time, two_min_averages, 'bo', markersize=1, label='4 Minute Range')
-    #plt.plot(time, fifteen_min_averages, 'go', markersize=1, label='30 Minute Range')
-    # Customize plot
-    #plt.xlabel('Time')  # X-axis label
-    #plt.ylabel('Electron Temperature')  # Y-axis label
-    #plt.title('Te using 3 different collection methods')  # Plot title
-    #plt.legend()  # Show legend
-    # Show plot
-    #plt.grid(True)
+    # Plotting electron temperature as a time series 
+    #temp_data = Te
+    #plt.plot(time_data, temp_data, marker='o', markersize = 0.5, label = 'Electron Temperature vs Time')
+    #plt.xlabel('Time')
+    #plt.ylabel('Electron Temperature')
+    #plt.title('Te vs Time')
     #plt.show()
     
-    # 15 minute window vs no range plotting to see correlation 
-    #plt.scatter(no_range, fifteen_min_averages, color='blue', label='Data', s=10)
-    #plt.xlabel('No Range')
-    #plt.ylabel('Fifteen minute window')
-    #plt.title('No range Te data vs Fifteen minute range')
+    # PLOTTING LHS EQUATION
+    #lhs_data = Earth_radius 
+    #time_data = np.arange(len(lhs_data))
+    # PLOTTING RHS EQUATION
+    #rhs_data = RHSradius
+    #time_data = np.arange(len(rhs_data))  
+    # PLOTTING TOGETHER - ensuring calculations give constant results
+    #plt.plot(time_data, lhs_data, label='Equation 1')
+    #plt.plot(time_data, rhs_data, label='Equation 2')
+    #plt.xlabel('Time')
+    #plt.ylabel('Radius (m)')
+    #plt.legend()
+    #plt.show()
+
+    # PLOTTING RHS EQUATION + RADIUS TOGETHER - should give equal values
+    #rhs_data = RHSradius
+    #time_data = np.arange(len(rhs_data))
+    #plt.plot(time_data, radius, label='Radius from SWARM')
+    #plt.plot(time_data, rhs_data, label='Radius from Equation with dilation + shifted theta')
+    #plt.xlabel('Time')
+    #plt.ylabel('Radius (m)')
+    #plt.legend()
     #plt.show()
     
-    # Decided on 15 min window on either side of the 30min point due to the little change in lat, lon and height
-    # Repeating process with latitude values as well as collecting median and difference every 30min interval
-    lat_fifteen = np.arange(0, len(lat_array), 3600)
-    print(lat_fifteen)
-    lat_fifteen_diff = []
-    lat_median = []
-    lat_mean = []
-    for i in lat_fifteen:
-        if i < len(lat_array):
-            # Get indices of the 30 elements before and after the 60th element
-            start_index = max(0, i - 1800)
-            end_index = min(i + 1801, len(lat_array))
-            surrounding_lat_indices = np.arange(start_index, end_index)
-            selected_lat = lat_array[surrounding_lat_indices]
-            # Find the highest and lowest values
-            lat_fifteen_ave = np.mean(selected_lat)
-            lat_mean.append(lat_fifteen_ave)
-            max_lat = np.max(selected_lat)
-            min_lat = np.min(selected_lat)
-            # Calculate the difference
-            difference_lat = max_lat - min_lat
-            # Append the difference to the list
-            lat_fifteen_diff.append(difference_lat)
-            latitude_median = np.median(selected_lat)
-            lat_median.append(latitude_median)
-    # Convert the list of averages to a NumPy array
-    lat_mean = np.array(lat_mean)
-    lat_fifteen_diff = np.array(lat_fifteen_diff)
-    print('The length of the lat mean array is:', len(lat_mean))
-    #print(lat_median)
-    
-    # Repeating for longitude
-    lon_fifteen = np.arange(0, len(lon_array), 3600)
-    lon_fifteen_diff = []
-    lon_median = []
-    lon_mean = []
-    # Compute the average for each group of 60th element and its surrounding elements
-    for i in lon_fifteen:
-        lon_index = min(i, len(lon_array) - 1)
+    # PLOTTING LATITUDE IN DEG
+    #deg_values = shiftedlat
+    #time_data = np.arange(len(deg_values))
+    #plt.plot(time_data, deg_values, label='Latitude in radians + shifted by pi/2')
+    #plt.xlabel('Time')
+    #plt.ylabel('Latitude')
+    #plt.legend()
+    #plt.show()
+
+    # Update start date for the next day
+    start_date += segment_length
+
+    # Add a condition to break the loop if start_date exceeds or equals end_date
+    if start_date >= end_date:
+        break
+
+# Searching for nan values in Te data and calculating mean and std dev excluding the nan values
+#print(Te_array)
+has_nan = np.isnan(Te_array.flatten())
+print(np.where(has_nan)[0])
+mean_value = np.mean(Te_array[~has_nan])
+print(mean_value)
+std_dev = np.std(Te_array[~has_nan])
+print(std_dev)
+# Establishing a lower and higher threshold to excluding outliers in Te data
+lower_threshold = mean_value - 2 * std_dev
+upper_threshold = mean_value + 2 * std_dev
+outliers = Te_array[(Te_array < lower_threshold) | (Te_array > upper_threshold)]
+
+# Plotting distribution of Te values with outliers 
+plt.hist(Te_array, bins=100, density=True, alpha=0.9, color='blue', edgecolor='blue')
+plt.xlim(0, 8000)  
+plt.ylim(0, 0.002)
+plt.xlabel('Values')
+plt.ylabel('Probability Density')
+plt.title('Distribution of Te with outliers')
+plt.show()
+
+# Printing outlier information
+data_no_outliers = Te_array[(Te_array >= lower_threshold) & (Te_array <= upper_threshold)]
+print("Lower Threshold:", lower_threshold)
+print("Upper Threshold:", upper_threshold)
+print("Number of outliers:", len(outliers))
+print("Data without outliers:", data_no_outliers)
+
+# Plotting distribution of Te values without outliers
+plt.hist(data_no_outliers, bins=100, density=True, alpha=0.9, color='green', edgecolor='green')
+#plt.xlim(0, 8000)  
+#plt.ylim(0, 0.002)
+plt.xlabel('Values')
+plt.ylabel('Probability Density')
+plt.title('Distribution of Te after Discarding Outliers')
+plt.show()
+
+# Testing of adjustment types to SWARM data to match to model data
+# First type was collecting data every 30 mins and using that point as the data point 
+no_range = data_no_outliers[::60]
+
+# Second type was using a fifteen minute range on either side of the 30 minute mark and averaging 
+# all the data within that window making that average the data point for every 30 mins
+fifteen_min = np.arange(0, len(data_no_outliers), 3600)
+fifteen_min_averages = []
+# Compute the average for each group of 60th element and its surrounding elements
+for i in fifteen_min:
+    te_index = min(i, len(data_no_outliers) - 1)
+    # Get indices of the 30 elements before and after the 60th element
+    surrounding_fifteen_indices = np.arange(max(0, te_index - 1800), min(te_index + 1801, len(data_no_outliers)))
+    selected_te = data_no_outliers[surrounding_fifteen_indices]
+    # Compute the average of the selected elements
+    fifteen_min_average = np.mean(selected_te)
+    # Append the average to the selected averages list
+    fifteen_min_averages.append(fifteen_min_average)
+# Add the average of the last group (from the last element of data_no_outliers)    
+selected_te_last = data_no_outliers[-1801:]
+fifteen_min_average_last = np.mean(selected_te_last)
+fifteen_min_averages.append(fifteen_min_average_last)
+# Converting average array into np array
+fifteen_min_averages = np.array(fifteen_min_averages)
+print(len(fifteen_min_averages))
+print(fifteen_min_averages[:48])
+
+# Plotting the no window, 2 min window and 15 min window to assess best results (repeated with many different ranges)
+#time = np.linspace(0, 10, 2757) 
+#plt.plot(time, no_range, 'ro', markersize=1, label='No Range')
+#plt.plot(time, two_min_averages, 'bo', markersize=1, label='4 Minute Range')
+#plt.plot(time, fifteen_min_averages, 'go', markersize=1, label='30 Minute Range')
+# Customize plot
+#plt.xlabel('Time')  # X-axis label
+#plt.ylabel('Electron Temperature')  # Y-axis label
+#plt.title('Te using 3 different collection methods')  # Plot title
+#plt.legend()  # Show legend
+# Show plot
+#plt.grid(True)
+#plt.show()
+
+# 15 minute window vs no range plotting to see correlation 
+#plt.scatter(no_range, fifteen_min_averages, color='blue', label='Data', s=10)
+#plt.xlabel('No Range')
+#plt.ylabel('Fifteen minute window')
+#plt.title('No range Te data vs Fifteen minute range')
+#plt.show()
+
+# Decided on 15 min window on either side of the 30min point due to the little change in lat, lon and height
+# Repeating process with latitude values as well as collecting median and difference every 30min interval
+lat_fifteen = np.arange(0, len(lat_array), 3600)
+print(lat_fifteen)
+lat_fifteen_diff = []
+lat_median = []
+lat_mean = []
+for i in lat_fifteen:
+    if i < len(lat_array):
         # Get indices of the 30 elements before and after the 60th element
-        surrounding_lon_indices = np.arange(max(0, lon_index - 1800), min(lon_index + 1801, len(lon_array)))
-        selected_lon = lon_array[surrounding_lon_indices]
+        start_index = max(0, i - 1800)
+        end_index = min(i + 1801, len(lat_array))
+        surrounding_lat_indices = np.arange(start_index, end_index)
+        selected_lat = lat_array[surrounding_lat_indices]
         # Find the highest and lowest values
-        lon_fifteen_ave = np.mean(selected_lon)
-        lon_mean.append(lon_fifteen_ave)
-        max_lon = np.max(selected_lon)
-        min_lon = np.min(selected_lon)
+        lat_fifteen_ave = np.mean(selected_lat)
+        lat_mean.append(lat_fifteen_ave)
+        max_lat = np.max(selected_lat)
+        min_lat = np.min(selected_lat)
         # Calculate the difference
-        difference_lon = max_lon - min_lon
+        difference_lat = max_lat - min_lat
         # Append the difference to the list
-        lon_fifteen_diff.append(difference_lon)
-        longitude_median = np.median(selected_lon)
-        lon_median.append(longitude_median)
-    # Convert the list of averages to a NumPy array
-    lon_mean = np.array(lon_mean)
-    lon_fifteen_diff = np.array(lon_fifteen_diff)
-    print(len(lon_mean))
-    
-    # testing for nan values, calculating mean, std dev and thresholds to exclude outliers for longitude due to
-    # jumping from high longitude to low as satellite moves
-    lon_nan = np.isnan(lon_fifteen_diff.flatten())
-    mean_lon_value = np.mean(lon_fifteen_diff[~lon_nan])
-    lon_std_dev = np.std(lon_fifteen_diff[~lon_nan])
-    lower_lon_threshold = mean_lon_value - 5 * lon_std_dev
-    upper_lon_threshold = mean_lon_value + 5 * lon_std_dev
-    lon_outliers = lon_fifteen_diff[(lon_fifteen_diff < lower_lon_threshold) | (lon_fifteen_diff > upper_lon_threshold)]
-    lon_no_outliers = lon_fifteen_diff[(lon_fifteen_diff >= lower_lon_threshold) & (lon_fifteen_diff <= upper_lon_threshold)]
-    
-    # Plotting distribution of difference in latitude every 30mins 
-    #plt.hist(lat_fifteen_diff, bins=100, color='blue', edgecolor='black')  
-    #plt.xlabel('Latitude difference')
-    #plt.ylabel('Frequency')
-    #plt.title('Distribution of latitude difference')
-    #plt.grid(True)  
-    #plt.show()
-    
-    # Plotting distribution of the difference in longitude every 30mins without outliers
-    #plt.hist(lon_no_outliers, bins=100, color='blue', edgecolor='black') 
-    #plt.yscale('log')
-    #plt.xlabel('Longitude difference')
-    #plt.ylabel('Frequency')
-    #plt.title('Distribution of longitude difference')
-    #plt.grid(True)  
-    #plt.show()
-    
-    # Repeating for height values but also collecting min, max, median and mean height values for every 30 mins
-    height_fifteen_min = np.arange(0, len(height_array), 3600)
-    height_averages = []
-    min_height = []
-    max_height = []
-    median_height = []
-    # Compute the average for each group of 60th element and its surrounding elements
-    for i in height_fifteen_min:
-        height_index = min(i, len(height_array) - 1)
-        # Get indices of the 30 elements before and after the 60th element
-        surrounding_height_indices = np.arange(max(0, height_index - 1800), min(height_index + 1801, len(height_array)))
-        selected_height = height_array[surrounding_height_indices]
-        # Compute the average of the selected elements
-        fifteen_height_average = np.mean(selected_height)
-        # Append the average to the selected averages list
-        height_averages.append(fifteen_height_average)
-        max_value = np.max(selected_height)
-        max_height.append(max_value)
-        min_value = np.min(selected_height)
-        min_height.append(min_value)
-        median_value = np.median(selected_height)
-        median_height.append(median_value)
-    # Convert the list of averages to a NumPy array
-    height_averages = np.array(height_averages)
-    print(len(height_averages))
+        lat_fifteen_diff.append(difference_lat)
+        latitude_median = np.median(selected_lat)
+        lat_median.append(latitude_median)
+# Convert the list of averages to a NumPy array
+lat_mean = np.array(lat_mean)
+lat_fifteen_diff = np.array(lat_fifteen_diff)
+print('The length of the lat mean array is:', len(lat_mean))
+#print(lat_median)
+
+# Repeating for longitude
+lon_fifteen = np.arange(0, len(lon_array), 3600)
+lon_fifteen_diff = []
+lon_median = []
+lon_mean = []
+# Compute the average for each group of 60th element and its surrounding elements
+for i in lon_fifteen:
+    lon_index = min(i, len(lon_array) - 1)
+    # Get indices of the 30 elements before and after the 60th element
+    surrounding_lon_indices = np.arange(max(0, lon_index - 1800), min(lon_index + 1801, len(lon_array)))
+    selected_lon = lon_array[surrounding_lon_indices]
+    # Find the highest and lowest values
+    lon_fifteen_ave = np.mean(selected_lon)
+    lon_mean.append(lon_fifteen_ave)
+    max_lon = np.max(selected_lon)
+    min_lon = np.min(selected_lon)
+    # Calculate the difference
+    difference_lon = max_lon - min_lon
+    # Append the difference to the list
+    lon_fifteen_diff.append(difference_lon)
+    longitude_median = np.median(selected_lon)
+    lon_median.append(longitude_median)
+# Convert the list of averages to a NumPy array
+lon_mean = np.array(lon_mean)
+lon_fifteen_diff = np.array(lon_fifteen_diff)
+print(len(lon_mean))
+
+# testing for nan values, calculating mean, std dev and thresholds to exclude outliers for longitude due to
+# jumping from high longitude to low as satellite moves
+lon_nan = np.isnan(lon_fifteen_diff.flatten())
+mean_lon_value = np.mean(lon_fifteen_diff[~lon_nan])
+lon_std_dev = np.std(lon_fifteen_diff[~lon_nan])
+lower_lon_threshold = mean_lon_value - 5 * lon_std_dev
+upper_lon_threshold = mean_lon_value + 5 * lon_std_dev
+lon_outliers = lon_fifteen_diff[(lon_fifteen_diff < lower_lon_threshold) | (lon_fifteen_diff > upper_lon_threshold)]
+lon_no_outliers = lon_fifteen_diff[(lon_fifteen_diff >= lower_lon_threshold) & (lon_fifteen_diff <= upper_lon_threshold)]
+
+# Plotting distribution of difference in latitude every 30mins 
+#plt.hist(lat_fifteen_diff, bins=100, color='blue', edgecolor='black')  
+#plt.xlabel('Latitude difference')
+#plt.ylabel('Frequency')
+#plt.title('Distribution of latitude difference')
+#plt.grid(True)  
+#plt.show()
+
+# Plotting distribution of the difference in longitude every 30mins without outliers
+#plt.hist(lon_no_outliers, bins=100, color='blue', edgecolor='black') 
+#plt.yscale('log')
+#plt.xlabel('Longitude difference')
+#plt.ylabel('Frequency')
+#plt.title('Distribution of longitude difference')
+#plt.grid(True)  
+#plt.show()
+
+# Repeating for height values but also collecting min, max, median and mean height values for every 30 mins
+height_fifteen_min = np.arange(0, len(height_array), 3600)
+height_averages = []
+min_height = []
+max_height = []
+median_height = []
+# Compute the average for each group of 60th element and its surrounding elements
+for i in height_fifteen_min:
+    height_index = min(i, len(height_array) - 1)
+    # Get indices of the 30 elements before and after the 60th element
+    surrounding_height_indices = np.arange(max(0, height_index - 1800), min(height_index + 1801, len(height_array)))
+    selected_height = height_array[surrounding_height_indices]
+    # Compute the average of the selected elements
+    fifteen_height_average = np.mean(selected_height)
+    # Append the average to the selected averages list
+    height_averages.append(fifteen_height_average)
+    max_value = np.max(selected_height)
+    max_height.append(max_value)
+    min_value = np.min(selected_height)
+    min_height.append(min_value)
+    median_value = np.median(selected_height)
+    median_height.append(median_value)
+# Convert the list of averages to a NumPy array
+height_averages = np.array(height_averages)
+print(len(height_averages))
     
