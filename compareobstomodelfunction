@@ -157,23 +157,23 @@ plt.show()
 #print("Number of values above 2000 in the second row:", count_above_6000_two)
         
 # Copy global attributes from input netCDF to new netCDF file
-conjunction_file.setncatts(input_model_data.__dict__)
+#conjunction_file.setncatts(input_model_data.__dict__)
 # Copy dimensions across
-for dimname, dim in input_model_data.dimensions.items():
-    conjunction_file.createDimension(dimname, len(dim) if not dim.isunlimited() else None)
+#for dimname, dim in input_model_data.dimensions.items():
+    #conjunction_file.createDimension(dimname, len(dim) if not dim.isunlimited() else None)
 # Copy variables and their attributes
-for varname, var in input_model_data.variables.items():
-    new_var = conjunction_file.createVariable(varname, var.dtype, var.dimensions)
-    new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
-    new_var[:] = var[:]  # Copy variable values
+#for varname, var in input_model_data.variables.items():
+    #new_var = conjunction_file.createVariable(varname, var.dtype, var.dimensions)
+    #new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+    #new_var[:] = var[:]  # Copy variable values
 # Add a new Te observation variable + corresponding dimensions
-Obs_time_dim = conjunction_file.createDimension('Observation time', 365)
-Obs_lat_dim = conjunction_file.createDimension('Observation latitude', 180)
-Obs_lon_dim = conjunction_file.createDimension('Observation longitude', 360)
-Obs_height_dim = conjunction_file.createDimension('Observation height', 360)
-TeObs = conjunction_file.createVariable('Observation Electron Temperature', 'f4', ('Observation time', 'Observation latitude', 'Observation longitude', 'Observation height'))
-TeObs.long_name = 'Observation Electron Temperature'
-TeObs.units = 'K'
+#Obs_time_dim = conjunction_file.createDimension('Observation time', 365)
+#Obs_lat_dim = conjunction_file.createDimension('Observation latitude', 180)
+#Obs_lon_dim = conjunction_file.createDimension('Observation longitude', 360)
+#Obs_height_dim = conjunction_file.createDimension('Observation height', 360)
+#TeObs = conjunction_file.createVariable('Observation Electron Temperature', 'f4', ('Observation time', 'Observation latitude', 'Observation longitude', 'Observation height'))
+#TeObs.long_name = 'Observation Electron Temperature'
+#TeObs.units = 'K'
 
 # Converting all model data into a np array
 latitude_array = latitude.astype('float32')
